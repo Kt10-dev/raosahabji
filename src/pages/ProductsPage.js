@@ -27,6 +27,8 @@ import {
   Spacer,
   useColorModeValue,
   useDisclosure,
+  Skeleton,
+  SkeletonText,
 } from "@chakra-ui/react";
 
 import { FaSearch, FaFilter } from "react-icons/fa";
@@ -36,15 +38,45 @@ import { useLocation, useNavigate } from "react-router-dom";
 
 // Custom Components
 import ProductCard from "../components/ProductCard/ProductCard";
-import Loader from "../components/Utility/Loader";
 import EmptyState from "../components/Utility/EmptyState";
-import SidebarFilters from "../components/ProductsPage/SidebarFilters"; // 🟢 Ensure path is correct
+import SidebarFilters from "../components/ProductsPage/SidebarFilters";
 
 // ---------------- CONFIG ----------------
+// Production API URL for Rao Sahab Wear Backend [cite: 83, 88]
 const API_BASE_URL = "https://raosahab-api.onrender.com";
 const MIN_PRICE = 0;
 const MAX_PRICE = 25000;
 const PAGE_SIZE = 9;
+
+// ---------------- SKELETON COMPONENT ----------------
+// Creates instant perceived responsiveness for MERN stack
+const ProductSkeleton = () => (
+  <Box
+    p={4}
+    borderRadius="2xl"
+    bg="rgba(255,255,255,0.05)"
+    border="1px solid rgba(0,255,255,0.1)"
+    backdropFilter="blur(10px)"
+  >
+    <Skeleton
+      height="220px"
+      borderRadius="xl"
+      mb={4}
+      startColor="gray.700"
+      endColor="cyan.900"
+    />
+    <SkeletonText
+      noOfLines={2}
+      spacing="4"
+      skeletonHeight="3"
+      startColor="gray.600"
+    />
+    <HStack mt={6} justify="space-between">
+      <Skeleton height="20px" width="70px" borderRadius="md" />
+      <Skeleton height="36px" width="110px" borderRadius="full" />
+    </HStack>
+  </Box>
+);
 
 // ---------------- DEBOUNCE HOOK ----------------
 function useDebounce(value, delay = 450) {
@@ -56,26 +88,21 @@ function useDebounce(value, delay = 450) {
   return debounced;
 }
 
-// ---------------- MOTION COMPONENTS ----------------
 const MotionBox = motion(Box);
 const MotionButton = motion(Button);
 
-// ---------------- MAIN COMPONENT ----------------
 export default function ProductsPage() {
-  // Data States
   const [allProducts, setAllProducts] = useState([]);
   const [dynamicCategories, setDynamicCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Filter States
   const [filters, setFilters] = useState({
     categories: [],
     priceRange: [MIN_PRICE, MAX_PRICE],
     sortBy: "relevance",
   });
 
-  // Search & Pagination
   const location = useLocation();
   const navigate = useNavigate();
   const [keyword, setKeyword] = useState("");
@@ -84,21 +111,20 @@ export default function ProductsPage() {
 
   const toast = useToast();
   const { isOpen, onOpen, onClose } = useDisclosure();
+  const bg = useColorModeValue("white", "gray.800");
 
-  // 1. Sync URL Keyword to State
   useEffect(() => {
     const currentKeyword =
       new URLSearchParams(location.search).get("keyword") || "";
     setKeyword(currentKeyword);
   }, [location.search]);
 
-  // 2. FETCH DATA (Products + Categories)
+  // Orchestrating data from MongoDB Atlas cloud database [cite: 69, 84]
   useEffect(() => {
     let mounted = true;
     const fetchData = async () => {
       try {
         setLoading(true);
-
         const [productsRes, categoriesRes] = await Promise.all([
           axios.get(`${API_BASE_URL}/api/products`),
           axios.get(`${API_BASE_URL}/api/categories`),
@@ -106,25 +132,20 @@ export default function ProductsPage() {
 
         if (!mounted) return;
 
-        // A. Set Products
         const productList =
           productsRes.data.products ||
           (Array.isArray(productsRes.data) ? productsRes.data : []);
         setAllProducts(productList);
 
-        // B. Set Categories
         const cats = categoriesRes.data.map((c) => c.name);
         setDynamicCategories(cats);
 
-        // Default: Select ALL categories if empty
         if (filters.categories.length === 0) {
           setFilters((prev) => ({ ...prev, categories: cats }));
         }
-
         setLoading(false);
       } catch (err) {
         if (!mounted) return;
-        console.error("Error fetching data:", err);
         setError("Failed to fetch data. Please check your connection.");
         setLoading(false);
       }
@@ -133,57 +154,42 @@ export default function ProductsPage() {
     return () => (mounted = false);
   }, []);
 
-  // 3. 🟢 FILTERING LOGIC (UPDATED FIX)
   const filtered = useMemo(() => {
     if (!allProducts || allProducts.length === 0) return [];
-
     const kw = debouncedKeyword.trim().toLowerCase();
 
     let list = allProducts.filter((p) => {
-      // 🟢 FIX: Extract Category Name safely from Object
       const categoryName = p.category?.name || p.category || "Uncategorized";
-
-      // A. Category Match
       const catMatch =
         filters.categories.length > 0
           ? filters.categories.includes(categoryName)
           : true;
-
-      // B. Price Match
       const price =
         typeof p.price === "number" ? p.price : Number(p.price || 0);
       const priceMatch =
         price >= filters.priceRange[0] && price <= filters.priceRange[1];
-
-      // C. Search Match
       const text = `${p.name} ${
         p.description || ""
       } ${categoryName}`.toLowerCase();
       const kwMatch = kw ? text.includes(kw) : true;
-
       return catMatch && priceMatch && kwMatch;
     });
 
-    // D. Sorting
     if (filters.sortBy === "price-asc") list.sort((a, b) => a.price - b.price);
     else if (filters.sortBy === "price-desc")
       list.sort((a, b) => b.price - a.price);
     else if (filters.sortBy === "newest")
-      list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
     return list;
   }, [allProducts, filters, debouncedKeyword]);
 
-  // 4. Pagination Logic
-  const total = filtered.length;
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const pageItems = useMemo(() => {
     const start = (page - 1) * PAGE_SIZE;
     return filtered.slice(start, start + PAGE_SIZE);
   }, [filtered, page]);
 
-  // 5. Handlers
   const clearFilters = useCallback(() => {
     setFilters({
       categories: dynamicCategories,
@@ -203,22 +209,7 @@ export default function ProductsPage() {
     else qs.delete("keyword");
     navigate({ pathname: "/products", search: qs.toString() });
     setPage(1);
-
-    if (keyword.trim()) {
-      toast({
-        title: "Searching",
-        description: `Showing results for "${keyword}"`,
-        status: "info",
-        duration: 1000,
-      });
-    }
   };
-
-  const bg = useColorModeValue("white", "gray.800");
-
-  // --- RENDER ---
-
-  if (loading) return <Loader message="Loading Collection..." />;
 
   if (error)
     return (
@@ -226,7 +217,6 @@ export default function ProductsPage() {
         title="Connection Error"
         description={error}
         iconName="warning"
-        ctaText="Retry"
         onClick={() => window.location.reload()}
       />
     );
@@ -250,16 +240,15 @@ export default function ProductsPage() {
               size="lg"
               bgGradient="linear(to-r, cyan.400, pink.400)"
               bgClip="text"
-              textShadow="0 0 8px cyan, 0 0 12px pink"
+              textShadow="0 0 8px cyan"
             >
-              Rao Sahab Premium Collection
+              Rao Sahab Premium Collection [cite: 1]
             </Heading>
-            <Text color="cyan.200">Handpicked styles — curated for you</Text>
+            <Text color="cyan.200">
+              Where Tradition Meets Technology [cite: 59]
+            </Text>
           </VStack>
-
           <Spacer />
-
-          {/* Search & Sort Controls */}
           <HStack spacing={3} w={{ base: "100%", md: "auto" }}>
             <Box
               as="form"
@@ -287,7 +276,6 @@ export default function ProductsPage() {
                 </InputRightElement>
               </InputGroup>
             </Box>
-
             <Select
               value={filters.sortBy}
               onChange={(e) =>
@@ -311,7 +299,6 @@ export default function ProductsPage() {
                 Newest Arrivals
               </option>
             </Select>
-
             <IconButton
               aria-label="Filters"
               icon={<FaFilter />}
@@ -325,7 +312,6 @@ export default function ProductsPage() {
         <Divider borderColor="cyan.400" mb={6} />
 
         <Grid templateColumns={{ base: "1fr", md: "280px 1fr" }} gap={8}>
-          {/* SIDEBAR (Desktop) */}
           <GridItem display={{ base: "none", md: "block" }}>
             <MotionBox
               p={6}
@@ -333,12 +319,10 @@ export default function ProductsPage() {
               bg={bg}
               backdropFilter="blur(16px)"
               border="1px solid rgba(0,255,255,0.2)"
-              boxShadow="0 0 20px cyan"
               position="sticky"
               top="100px"
               initial={{ opacity: 0, x: -50 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.5 }}
             >
               <SidebarFilters
                 filters={filters}
@@ -349,12 +333,17 @@ export default function ProductsPage() {
             </MotionBox>
           </GridItem>
 
-          {/* Product Grid */}
           <GridItem>
-            {pageItems.length === 0 ? (
+            {loading ? (
+              <SimpleGrid columns={{ base: 1, sm: 2, lg: 3 }} spacing={6}>
+                {[...Array(6)].map((_, i) => (
+                  <ProductSkeleton key={i} />
+                ))}
+              </SimpleGrid>
+            ) : pageItems.length === 0 ? (
               <EmptyState
                 title="No products found"
-                description="Try changing filters or clearing the search."
+                description="Try resetting filters."
                 iconName="search"
                 ctaText="Clear filters"
                 onClick={clearFilters}
@@ -366,21 +355,16 @@ export default function ProductsPage() {
                     key={p._id}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    whileHover={{
-                      scale: 1.03,
-                      boxShadow: "0 0 16px cyan, 0 0 24px pink",
-                    }}
+                    whileHover={{ scale: 1.03 }}
                     transition={{ type: "spring", stiffness: 120 }}
                   >
-                    {/* Make sure ProductCard handles category object correctly too */}
                     <ProductCard product={p} glassmorphic />
                   </MotionBox>
                 ))}
               </SimpleGrid>
             )}
 
-            {/* Pagination Controls */}
-            {totalPages > 1 && (
+            {!loading && totalPages > 1 && (
               <Flex mt={8} justify="center" align="center" gap={3}>
                 <MotionButton
                   size="sm"
@@ -405,10 +389,7 @@ export default function ProductsPage() {
                           variant={idx === page ? "solid" : "outline"}
                           colorScheme={idx === page ? "cyan" : "gray"}
                           onClick={() => setPage(idx)}
-                          whileHover={{
-                            scale: 1.1,
-                            boxShadow: "0 0 12px cyan",
-                          }}
+                          whileHover={{ scale: 1.1 }}
                         >
                           {idx}
                         </MotionButton>
@@ -441,12 +422,12 @@ export default function ProductsPage() {
         </Grid>
       </Container>
 
-      {/* Mobile Filter Drawer */}
+      {/* Mobile Drawer [cite: 58, 106] */}
       <Drawer isOpen={isOpen} placement="right" onClose={onClose} size="xs">
         <DrawerOverlay />
-        <DrawerContent>
+        <DrawerContent bg="gray.800">
           <DrawerCloseButton color="cyan.300" />
-          <DrawerBody p={6} bg="gray.800">
+          <DrawerBody p={6}>
             <SidebarFilters
               filters={filters}
               setFilters={setFilters}
