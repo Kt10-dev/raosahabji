@@ -152,7 +152,7 @@ export default function ProductsPage() {
     };
     fetchData();
     return () => (mounted = false);
-  }, []);
+  }, [filters.categories.length, debouncedKeyword]);
 
   const filtered = useMemo(() => {
     if (!allProducts || allProducts.length === 0) return [];

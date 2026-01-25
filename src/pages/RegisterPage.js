@@ -114,7 +114,7 @@ const RegisterPage = () => {
       await axios.post(
         `${API_BASE_URL}/api/users/send-otp`,
         { name, email, password },
-        config
+        config,
       );
 
       setRiveSuccess(true);
@@ -165,13 +165,12 @@ const RegisterPage = () => {
       const { data } = await axios.post(
         `${API_BASE_URL}/api/users/verify-otp`,
         { email, otp },
-        config
+        config,
       );
       login(data);
       toast({
         title: "Registration Complete!",
         description: `Welcome, ${data.name}!`,
-        status: "success",
         status: "success",
       });
       navigate("/");
@@ -425,7 +424,7 @@ const RegisterPage = () => {
                       value={otp}
                       onChange={(e) =>
                         setOtp(
-                          e.target.value.replace(/[^0-9]/g, "").slice(0, 6)
+                          e.target.value.replace(/[^0-9]/g, "").slice(0, 6),
                         )
                       }
                       textAlign="center"
