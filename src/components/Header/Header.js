@@ -18,7 +18,7 @@ import { useAuth } from "../../context/AuthContext";
 
 const Header = () => {
   const { cartTotal } = useCart();
-  const { user, isAdmin } = useAuth();
+  const { isAdmin } = useAuth();
   const { isOpen, onToggle } = useDisclosure();
 
   const navItems = [

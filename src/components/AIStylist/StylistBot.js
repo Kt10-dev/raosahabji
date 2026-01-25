@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   Box,
   VStack,
@@ -11,7 +11,6 @@ import {
   useDisclosure,
   Avatar,
   ScaleFade,
-  Link,
 } from "@chakra-ui/react";
 import { FaRobot, FaPaperPlane, FaTimes } from "react-icons/fa";
 import { motion } from "framer-motion";
