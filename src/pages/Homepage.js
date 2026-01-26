@@ -236,7 +236,7 @@ const Homepage = () => {
                 <Box textAlign="center" mt={16}>
                   <Button
                     as={RouterLink}
-                    to="/shop"
+                    to="/products"
                     size="lg"
                     height="60px"
                     px={12}
