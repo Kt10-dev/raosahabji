@@ -42,14 +42,11 @@ import EmptyState from "../components/Utility/EmptyState";
 import SidebarFilters from "../components/ProductsPage/SidebarFilters";
 
 // ---------------- CONFIG ----------------
-// Production API URL for Rao Sahab Wear Backend [cite: 83, 88]
 const API_BASE_URL = "https://raosahab-api.onrender.com";
 const MIN_PRICE = 0;
 const MAX_PRICE = 25000;
-const PAGE_SIZE = 9;
 
 // ---------------- SKELETON COMPONENT ----------------
-// Creates instant perceived responsiveness for MERN stack
 const ProductSkeleton = () => (
   <Box
     p={4}
@@ -89,7 +86,6 @@ function useDebounce(value, delay = 450) {
 }
 
 const MotionBox = motion(Box);
-const MotionButton = motion(Button);
 
 export default function ProductsPage() {
   const [allProducts, setAllProducts] = useState([]);
@@ -107,7 +103,6 @@ export default function ProductsPage() {
   const navigate = useNavigate();
   const [keyword, setKeyword] = useState("");
   const debouncedKeyword = useDebounce(keyword, 450);
-  const [page, setPage] = useState(1);
 
   const toast = useToast();
   const { isOpen, onOpen, onClose } = useDisclosure();
@@ -119,7 +114,7 @@ export default function ProductsPage() {
     setKeyword(currentKeyword);
   }, [location.search]);
 
-  // Orchestrating data from MongoDB Atlas cloud database [cite: 69, 84]
+  // Fetching data from Render backend
   useEffect(() => {
     let mounted = true;
     const fetchData = async () => {
@@ -154,6 +149,7 @@ export default function ProductsPage() {
     return () => (mounted = false);
   }, [filters.categories.length, debouncedKeyword]);
 
+  // 🟢 Logic: Showing ALL filtered products without slicing
   const filtered = useMemo(() => {
     if (!allProducts || allProducts.length === 0) return [];
     const kw = debouncedKeyword.trim().toLowerCase();
@@ -168,9 +164,8 @@ export default function ProductsPage() {
         typeof p.price === "number" ? p.price : Number(p.price || 0);
       const priceMatch =
         price >= filters.priceRange[0] && price <= filters.priceRange[1];
-      const text = `${p.name} ${
-        p.description || ""
-      } ${categoryName}`.toLowerCase();
+      const text =
+        `${p.name} ${p.description || ""} ${categoryName}`.toLowerCase();
       const kwMatch = kw ? text.includes(kw) : true;
       return catMatch && priceMatch && kwMatch;
     });
@@ -184,12 +179,6 @@ export default function ProductsPage() {
     return list;
   }, [allProducts, filters, debouncedKeyword]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const pageItems = useMemo(() => {
-    const start = (page - 1) * PAGE_SIZE;
-    return filtered.slice(start, start + PAGE_SIZE);
-  }, [filtered, page]);
-
   const clearFilters = useCallback(() => {
     setFilters({
       categories: dynamicCategories,
@@ -197,7 +186,6 @@ export default function ProductsPage() {
       sortBy: "relevance",
     });
     setKeyword("");
-    setPage(1);
     navigate("/products", { replace: true });
     toast({ title: "Filters Reset", status: "info", duration: 1000 });
   }, [navigate, dynamicCategories, toast]);
@@ -208,7 +196,6 @@ export default function ProductsPage() {
     if (keyword.trim()) qs.set("keyword", keyword.trim());
     else qs.delete("keyword");
     navigate({ pathname: "/products", search: qs.toString() });
-    setPage(1);
   };
 
   if (error)
@@ -228,7 +215,6 @@ export default function ProductsPage() {
       pb={20}
     >
       <Container maxW="1300px" py={8} px={{ base: 4, md: 6 }}>
-        {/* Header Section */}
         <Stack
           direction={{ base: "column", md: "row" }}
           spacing={4}
@@ -242,11 +228,9 @@ export default function ProductsPage() {
               bgClip="text"
               textShadow="0 0 8px cyan"
             >
-              Rao Sahab Premium Collection [cite: 1]
+              Rao Sahab Premium Collection
             </Heading>
-            <Text color="cyan.200">
-              Where Tradition Meets Technology [cite: 59]
-            </Text>
+            <Text color="cyan.200">Where Tradition Meets Technology.</Text>
           </VStack>
           <Spacer />
           <HStack spacing={3} w={{ base: "100%", md: "auto" }}>
@@ -340,7 +324,7 @@ export default function ProductsPage() {
                   <ProductSkeleton key={i} />
                 ))}
               </SimpleGrid>
-            ) : pageItems.length === 0 ? (
+            ) : filtered.length === 0 ? (
               <EmptyState
                 title="No products found"
                 description="Try resetting filters."
@@ -350,7 +334,7 @@ export default function ProductsPage() {
               />
             ) : (
               <SimpleGrid columns={{ base: 1, sm: 2, lg: 3 }} spacing={6}>
-                {pageItems.map((p) => (
+                {filtered.map((p) => (
                   <MotionBox
                     key={p._id}
                     initial={{ opacity: 0, y: 20 }}
@@ -363,66 +347,10 @@ export default function ProductsPage() {
                 ))}
               </SimpleGrid>
             )}
-
-            {!loading && totalPages > 1 && (
-              <Flex mt={8} justify="center" align="center" gap={3}>
-                <MotionButton
-                  size="sm"
-                  onClick={() => setPage((s) => Math.max(1, s - 1))}
-                  isDisabled={page === 1}
-                  whileHover={{ scale: 1.1 }}
-                >
-                  Prev
-                </MotionButton>
-                <HStack spacing={2}>
-                  {Array.from({ length: totalPages }).map((_, i) => {
-                    const idx = i + 1;
-                    if (
-                      idx === 1 ||
-                      idx === totalPages ||
-                      Math.abs(idx - page) <= 1
-                    ) {
-                      return (
-                        <MotionButton
-                          key={idx}
-                          size="sm"
-                          variant={idx === page ? "solid" : "outline"}
-                          colorScheme={idx === page ? "cyan" : "gray"}
-                          onClick={() => setPage(idx)}
-                          whileHover={{ scale: 1.1 }}
-                        >
-                          {idx}
-                        </MotionButton>
-                      );
-                    }
-                    if (
-                      (idx === 2 && page > 3) ||
-                      (idx === totalPages - 1 && page < totalPages - 2)
-                    ) {
-                      return (
-                        <Text key={`dot-${idx}`} color="cyan.200">
-                          …
-                        </Text>
-                      );
-                    }
-                    return null;
-                  })}
-                </HStack>
-                <MotionButton
-                  size="sm"
-                  onClick={() => setPage((s) => Math.min(totalPages, s + 1))}
-                  isDisabled={page === totalPages}
-                  whileHover={{ scale: 1.1 }}
-                >
-                  Next
-                </MotionButton>
-              </Flex>
-            )}
           </GridItem>
         </Grid>
       </Container>
 
-      {/* Mobile Drawer [cite: 58, 106] */}
       <Drawer isOpen={isOpen} placement="right" onClose={onClose} size="xs">
         <DrawerOverlay />
         <DrawerContent bg="gray.800">
